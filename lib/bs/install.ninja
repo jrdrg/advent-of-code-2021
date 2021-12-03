@@ -7,4 +7,8 @@ o day01.cmi : cp ../bs/src/day01.cmi
 o day01.cmj : cp ../bs/src/day01.cmj
 o day01.cmt : cp ../bs/src/day01.cmt
 o day01.res : cp ../../src/day01.res
-build install.stamp : touch day01.cmi day01.cmj 
+o day02.cmi : cp ../bs/src/day02.cmi
+o day02.cmj : cp ../bs/src/day02.cmj
+o day02.cmt : cp ../bs/src/day02.cmt
+o day02.res : cp ../../src/day02.res
+build install.stamp : touch day01.cmi day01.cmj day02.cmi day02.cmj 
