@@ -1,0 +1,13 @@
+rescript = 1
+rule astj
+  command = /Users/jrodriguez/projects/advent-of-code-2021/node_modules/rescript/darwin/bsc.exe  -bs-v 9.1.4  -absname -bs-ast -o $out $i
+o src/day01.ast : astj ../../src/day01.res
+rule deps
+  command = /Users/jrodriguez/projects/advent-of-code-2021/node_modules/rescript/darwin/bsb_helper.exe -hash 981e2fa2e3bd7de7a7d117ad0cceb3c9 $in
+  restat = 1
+o src/day01.d : deps src/day01.ast
+rule mij
+  command = /Users/jrodriguez/projects/advent-of-code-2021/node_modules/rescript/darwin/bsc.exe -I src   -bs-package-name advent-of-code-2021 -bs-package-output commonjs:$in_d:.bs.js $i
+  dyndep = 1
+  restat = 1
+o src/day01.cmj src/day01.cmi ../../src/day01.bs.js : mij src/day01.ast

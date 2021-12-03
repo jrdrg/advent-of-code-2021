@@ -1,0 +1,16 @@
+{
+	"name": "advent-of-code-2021",
+	"version": "1.0.0",
+	"description": "",
+	"main": "index.js",
+	"scripts": {
+		"test": "echo \"Error: no test specified\" && exit 1",
+		"build": "rescript",
+		"start": "rescript build -w"
+	},
+	"author": "",
+	"license": "ISC",
+	"devDependencies": {
+		"rescript": "^9.1.4"
+	}
+}
