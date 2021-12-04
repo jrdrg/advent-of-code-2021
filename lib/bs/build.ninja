@@ -3,7 +3,7 @@ rule astj
   command = /Users/jrodriguez/projects/advent-of-code-2021/node_modules/rescript/darwin/bsc.exe  -bs-v 9.1.4  -absname -bs-ast -o $out $i
 o src/day01.ast : astj ../../src/day01.res
 rule deps
-  command = /Users/jrodriguez/projects/advent-of-code-2021/node_modules/rescript/darwin/bsb_helper.exe -hash 524e2dc103df339f7d7cc81bf9e44db2 $in
+  command = /Users/jrodriguez/projects/advent-of-code-2021/node_modules/rescript/darwin/bsb_helper.exe -hash 035f767cbfe1db3fa8aaefba7f5e3fbb $in
   restat = 1
 o src/day01.d : deps src/day01.ast
 rule mij
@@ -14,3 +14,6 @@ o src/day01.cmj src/day01.cmi ../../src/day01.bs.js : mij src/day01.ast
 o src/day02.ast : astj ../../src/day02.res
 o src/day02.d : deps src/day02.ast
 o src/day02.cmj src/day02.cmi ../../src/day02.bs.js : mij src/day02.ast
+o src/day03.ast : astj ../../src/day03.res
+o src/day03.d : deps src/day03.ast
+o src/day03.cmj src/day03.cmi ../../src/day03.bs.js : mij src/day03.ast
