@@ -141,20 +141,17 @@ let getPointCoordinates = (point: string) => {
 }
 
 let isLowPoint = (point: string, map: Belt.Map.String.t<int>) => {
-  switch getPointCoordinates(point) {
-  | (row, col) =>
-    switch Belt.Map.String.get(map, mapKey(row, col)) {
-    | Some(value) =>
-      getValidNeighbors(row, col, map) |> List.for_all(((r, c)) => {
-        switch Belt.Map.String.get(map, mapKey(r, c)) {
-        | Some(adjacentValue) => value < adjacentValue
-        | None => false
-        }
-      })
+  let (row, col) = getPointCoordinates(point)
+  switch Belt.Map.String.get(map, mapKey(row, col)) {
+  | Some(value) =>
+    getValidNeighbors(row, col, map) |> List.for_all(((r, c)) => {
+      switch Belt.Map.String.get(map, mapKey(r, c)) {
+      | Some(adjacentValue) => value < adjacentValue
+      | None => false
+      }
+    })
 
-    | None => raise(InvalidPoint(point))
-    }
-  | _ => raise(InvalidPoint(point))
+  | None => raise(InvalidPoint(point))
   }
 }
 
