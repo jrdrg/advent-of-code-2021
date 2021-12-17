@@ -16,7 +16,7 @@ function coordsToString(r, c) {
 }
 
 function stringToCoords(key) {
-  var coords = $$Array.of_list(List.map(Caml_format.caml_int_of_string, $$String.split_on_char(/* ':' */58, key)));
+  var coords = $$Array.map(Caml_format.caml_int_of_string, key.split(":"));
   return [
           Caml_array.get(coords, 0),
           Caml_array.get(coords, 1)
@@ -120,6 +120,11 @@ function getNeighbors(row, col, grid) {
   return validPoints(possible, grid);
 }
 
+function getNonDiagonalNeighbors(row, col, grid) {
+  var possible = getAdjacentNeighborCoords(row, col);
+  return validPoints(possible, grid);
+}
+
 function valueAt(r, c, grid) {
   return Belt_MapString.get(grid, coordsToString(r, c));
 }
@@ -130,8 +135,24 @@ function setValueAt(r, c, v, grid) {
 
 var toPointsList = Belt_MapString.keysToArray;
 
-function fromString(_input) {
-  
+function fromString(converter, input) {
+  var rows = $$String.split_on_char(/* '\n' */10, input);
+  return List.fold_left((function (map, param) {
+                var rIndex = param[0];
+                return List.fold_left((function (map2, param) {
+                              return Belt_MapString.set(map2, coordsToString(rIndex, param[0]), Curry._1(converter, param[1]));
+                            }), map, List.mapi((function (i, row) {
+                                  return [
+                                          i,
+                                          row
+                                        ];
+                                }), $$Array.to_list(param[1].split(""))));
+              }), undefined, List.mapi((function (i, row) {
+                    return [
+                            i,
+                            row
+                          ];
+                  }), rows));
 }
 
 function size(grid) {
@@ -156,6 +177,12 @@ var pointsCount = Belt_MapString.size;
 function fromPointsList(initialValue, points) {
   return List.fold_left((function (grid, param) {
                 return Belt_MapString.set(grid, coordsToString(param[0], param[1]), initialValue);
+              }), undefined, points);
+}
+
+function fromPointsAndValueList(points) {
+  return List.fold_left((function (grid, param) {
+                return Belt_MapString.set(grid, coordsToString(param[0], param[1]), param[2]);
               }), undefined, points);
 }
 
@@ -197,6 +224,7 @@ exports.getAdjacentNeighborCoords = getAdjacentNeighborCoords;
 exports.getNeighborCoords = getNeighborCoords;
 exports.validPoints = validPoints;
 exports.getNeighbors = getNeighbors;
+exports.getNonDiagonalNeighbors = getNonDiagonalNeighbors;
 exports.valueAt = valueAt;
 exports.setValueAt = setValueAt;
 exports.toPointsList = toPointsList;
@@ -204,5 +232,6 @@ exports.fromString = fromString;
 exports.size = size;
 exports.pointsCount = pointsCount;
 exports.fromPointsList = fromPointsList;
+exports.fromPointsAndValueList = fromPointsAndValueList;
 exports.print = print;
 /* No side effect */

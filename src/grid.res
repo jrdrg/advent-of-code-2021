@@ -3,7 +3,7 @@ type t<'v> = Belt.Map.String.t<'v>
 let coordsToString = (r, c) => j`${string_of_int(r)}:${string_of_int(c)}`
 
 let stringToCoords = key => {
-  let coords = key |> String.split_on_char(':') |> List.map(int_of_string) |> Array.of_list
+  let coords = Js.String.split(":", key) |> Array.map(int_of_string)
   (coords[0], coords[1])
 }
 
@@ -35,6 +35,11 @@ let getNeighbors = (row, col, grid: t<'v>) => {
   validPoints(possible, grid)
 }
 
+let getNonDiagonalNeighbors = (row, col, grid: t<'v>) => {
+  let possible = getAdjacentNeighborCoords(row, col)
+  validPoints(possible, grid)
+}
+
 let valueAt = (r, c, grid: t<'v>) => {
   Belt.Map.String.get(grid, coordsToString(r, c))
 }
@@ -47,8 +52,17 @@ let toPointsList = (grid: t<'v>) => {
   grid |> Belt.Map.String.keysToArray
 }
 
-let fromString = (_input: string): t<'v> => {
-  Belt.Map.String.empty
+let fromString = (converter: string => 'v, input: string): t<'v> => {
+  let rows = input |> String.split_on_char('\n')
+  rows |> List.mapi((i, row) => (i, row)) |> List.fold_left((map, (rIndex, row)) => {
+    row
+    |> Js.String.split("")
+    |> Array.to_list
+    |> List.mapi((i, row) => (i, row))
+    |> List.fold_left((map2, (cIndex, col)) => {
+      Belt.Map.String.set(map2, coordsToString(rIndex, cIndex), converter(col))
+    }, map)
+  }, Belt.Map.String.empty)
 }
 
 let size = (grid: t<'v>): (int, int) => {
@@ -69,6 +83,12 @@ let pointsCount = (grid: t<'v>) => {
 let fromPointsList = (initialValue: 'v, points: list<(int, int)>): t<'v> => {
   points |> List.fold_left((grid, (r, c)) => {
     Belt.Map.String.set(grid, coordsToString(r, c), initialValue)
+  }, Belt.Map.String.empty)
+}
+
+let fromPointsAndValueList = (points: list<(int, int, 'v)>): t<'v> => {
+  points |> List.fold_left((grid, (r, c, v)) => {
+    Belt.Map.String.set(grid, coordsToString(r, c), v)
   }, Belt.Map.String.empty)
 }
 
