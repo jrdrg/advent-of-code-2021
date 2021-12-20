@@ -4,10 +4,11 @@
 var List = require("rescript/lib/js/list.js");
 var $$Array = require("rescript/lib/js/array.js");
 var Caml_array = require("rescript/lib/js/caml_array.js");
+var Pervasives = require("rescript/lib/js/pervasives.js");
 var Caml_format = require("rescript/lib/js/caml_format.js");
 var Caml_exceptions = require("rescript/lib/js/caml_exceptions.js");
 
-var operatorCountExampleStr = "EE00D40C823060";
+var inputStr = "E0529D18025800ABCA6996534CB22E4C00FB48E233BAEC947A8AA010CE1249DB51A02CC7DB67EF33D4002AE6ACDC40101CF0449AE4D9E4C071802D400F84BD21CAF3C8F2C35295EF3E0A600848F77893360066C200F476841040401C88908A19B001FD35CCF0B40012992AC81E3B980553659366736653A931018027C87332011E2771FFC3CEEC0630A80126007B0152E2005280186004101060C03C0200DA66006B8018200538012C01F3300660401433801A6007380132DD993100A4DC01AB0803B1FE2343500042E24C338B33F5852C3E002749803B0422EC782004221A41A8CE600EC2F8F11FD0037196CF19A67AA926892D2C643675A0C013C00CC0401F82F1BA168803510E3942E969C389C40193CFD27C32E005F271CE4B95906C151003A7BD229300362D1802727056C00556769101921F200AC74015960E97EC3F2D03C2430046C0119A3E9A3F95FD3AFE40132CEC52F4017995D9993A90060729EFCA52D3168021223F2236600ECC874E10CC1F9802F3A71C00964EC46E6580402291FE59E0FCF2B4EC31C9C7A6860094B2C4D2E880592F1AD7782992D204A82C954EA5A52E8030064D02A6C1E4EA852FE83D49CB4AE4020CD80272D3B4AA552D3B4AA5B356F77BF1630056C0119FF16C5192901CEDFB77A200E9E65EAC01693C0BCA76FEBE73487CC64DEC804659274A00CDC401F8B51CE3F8803B05217C2E40041A72E2516A663F119AC72250A00F44A98893C453005E57415A00BCD5F1DD66F3448D2600AC66F005246500C9194039C01986B317CDB10890C94BF68E6DF950C0802B09496E8A3600BCB15CA44425279539B089EB7774DDA33642012DA6B1E15B005C0010C8C917A2B880391160944D30074401D845172180803D1AA3045F00042630C5B866200CC2A9A5091C43BBD964D7F5D8914B46F040";
 
 var InvalidHexDigit = /* @__PURE__ */Caml_exceptions.create("Day16.Binary.InvalidHexDigit");
 
@@ -91,7 +92,7 @@ function packetTypeToString(packetType) {
 }
 
 function packetToString(packet) {
-  return "<v(" + packet.version.toString() + "):" + packetTypeToString(packet.packetType) + ">";
+  return "<v(" + packet.version.toString() + "):" + packetTypeToString(packet.packetType) + "__" + String(packet.length) + ">";
 }
 
 function parseInput(input) {
@@ -181,6 +182,67 @@ function parseLiteralValue(_binary, _value, _length) {
   };
 }
 
+function parseLiteral(binary, index) {
+  var InvalidLiteralValue = /* @__PURE__ */Caml_exceptions.create("InvalidLiteralValue");
+  var _idx = index;
+  var _value = "";
+  while(true) {
+    var value = _value;
+    var idx = _idx;
+    var match = $$Array.sub(binary, idx, 5);
+    if (match.length !== 5) {
+      throw {
+            RE_EXN_ID: InvalidLiteralValue,
+            _1: index,
+            _2: "",
+            Error: new Error()
+          };
+    }
+    var match$1 = match[0];
+    if (match$1 !== 0) {
+      if (match$1 !== 1) {
+        throw {
+              RE_EXN_ID: InvalidLiteralValue,
+              _1: index,
+              _2: "",
+              Error: new Error()
+            };
+      }
+      var a = match[1];
+      var b = match[2];
+      var c = match[3];
+      var d = match[4];
+      var val = value + $$Array.map((function (prim) {
+                return String(prim);
+              }), [
+              a,
+              b,
+              c,
+              d
+            ]).join("");
+      _value = val;
+      _idx = idx + 5 | 0;
+      continue ;
+    }
+    var a$1 = match[1];
+    var b$1 = match[2];
+    var c$1 = match[3];
+    var d$1 = match[4];
+    var val$1 = value + $$Array.map((function (prim) {
+              return String(prim);
+            }), [
+            a$1,
+            b$1,
+            c$1,
+            d$1
+          ]).join("");
+    return [
+            toDecimal(stringToNumber(val$1)),
+            idx + 5 | 0
+          ];
+  };
+}
+
 function lengthTypeIdToString(typeId) {
   if (typeId.TAG === /* TotalLength */0) {
     return "TotalLength(" + String(typeId._0) + ")";
@@ -189,9 +251,9 @@ function lengthTypeIdToString(typeId) {
   }
 }
 
-function determineOperatorType(binary) {
+function determineOperatorType(index, binary) {
   var InvalidLengthTypeId = /* @__PURE__ */Caml_exceptions.create("InvalidLengthTypeId");
-  var match = Caml_array.get(binary, 0);
+  var match = Caml_array.get(binary, index);
   if (match !== 0) {
     if (match !== 1) {
       throw {
@@ -200,33 +262,40 @@ function determineOperatorType(binary) {
             Error: new Error()
           };
     }
-    var subPacketCount = toDecimal($$Array.sub(binary, 1, 11));
+    var subPacketCount = toDecimal($$Array.sub(binary, index + 1 | 0, 11));
     return [
             {
               TAG: /* SubpacketsCount */1,
               _0: subPacketCount | 0
             },
-            12
+            index + 12 | 0
           ];
   }
-  var totalLength = toDecimal($$Array.sub(binary, 1, 15));
+  var totalLength = toDecimal($$Array.sub(binary, index + 1 | 0, 15));
   return [
           {
             TAG: /* TotalLength */0,
             _0: totalLength | 0
           },
-          16
+          index + 16 | 0
         ];
 }
 
-function splitPacket(binary) {
-  var version = toDecimal($$Array.sub(binary, 0, 3));
-  var typeId = toDecimal($$Array.sub(binary, 3, 3));
-  var value = $$Array.sub(binary, 6, binary.length - 6 | 0);
+function hasRemainingPackets(index, binary) {
+  return index < (binary.length - 7 | 0);
+}
+
+function splitPacket(index, binary) {
+  var version = toDecimal($$Array.sub(binary, index, 3));
+  var typeId = toDecimal($$Array.sub(binary, index + 3 | 0, 3));
+  var value = $$Array.sub(binary, index + 6 | 0, binary.length - (index + 6 | 0) | 0);
   return [
-          version,
-          typeId,
-          value
+          [
+            version,
+            typeId,
+            value
+          ],
+          index + 6 | 0
         ];
 }
 
@@ -234,180 +303,191 @@ function packetsToString(packets) {
   return $$Array.of_list(List.map(packetToString, packets));
 }
 
-function decodeSubpacketsByLength(_binary, _subpackets, _currentLength, totalLength) {
-  while(true) {
-    var currentLength = _currentLength;
-    var subpackets = _subpackets;
-    var binary = _binary;
-    console.log("decoding subpackets by length", [
-          currentLength,
-          totalLength,
-          binary.length
-        ]);
-    if (currentLength >= totalLength) {
-      console.log(" -- COMPLETED READING length", $$Array.of_list(List.map(packetToString, subpackets)));
-      console.log(" ?? sanity check", [
-            binary.length,
-            currentLength
-          ]);
-      return subpackets;
-    }
-    var subArray = $$Array.sub(binary, currentLength, binary.length - currentLength | 0);
-    console.log(" -- length", subArray.length);
-    var match = splitPacket(subArray);
-    var match$1 = decodePacket(subArray);
-    var length = match$1[1];
-    var subpacket = match$1[0];
-    console.log(" -- subpacket split", [
-          match[0],
-          match[1],
-          match[2].join(""),
-          length
-        ]);
-    console.log(" -- subpacket", packetToString(subpacket));
-    _currentLength = currentLength + length | 0;
-    _subpackets = {
-      hd: subpacket,
-      tl: subpackets
-    };
-    _binary = subArray;
-    continue ;
-  };
-}
-
-function decodeSubpacketsByCount(_binary, _subpackets, _currentCount, totalCount, _arrayPos) {
-  while(true) {
-    var arrayPos = _arrayPos;
-    var currentCount = _currentCount;
-    var subpackets = _subpackets;
-    var binary = _binary;
-    console.log("decoding subpackets by count", [
-          currentCount,
-          totalCount,
-          binary.length
-        ]);
-    if (currentCount >= totalCount) {
-      console.log(" -- COMPLETED READING count", [
-            $$Array.of_list(List.map(packetToString, subpackets)),
-            arrayPos
-          ]);
-      return [
-              subpackets,
-              arrayPos
-            ];
-    }
-    var match = decodePacket(binary);
-    var length = match[1];
-    var subpacket = match[0];
-    console.log(" > decoded by count", [
-          packetToString(subpacket),
-          length
-        ]);
-    var newLength = binary.length - length | 0;
-    var subArray = $$Array.sub(binary, length, newLength);
-    console.log(" >> new length", [
-          length,
-          newLength
-        ]);
-    console.log(" >> new length", [
-          length,
-          newLength,
-          binary.length,
-          subArray.length
-        ]);
-    _arrayPos = length;
-    _currentCount = currentCount + 1 | 0;
-    _subpackets = {
-      hd: subpacket,
-      tl: subpackets
-    };
-    _binary = subArray;
-    continue ;
-  };
-}
-
-function decodePacket(binary) {
-  var match = splitPacket(binary);
-  var value = match[2];
-  var typeId = match[1];
-  var version = match[0];
-  console.log("\n\n -- Decoding packet, length", binary.length);
-  console.log(" -- contents", binary.join(""));
-  if (typeId !== 4) {
-    var match$1 = determineOperatorType(value);
-    var packetStart = match$1[1];
-    var operatorType = match$1[0];
-    var packetValues = $$Array.sub(value, packetStart, value.length - packetStart | 0);
-    console.log("operator", [
-          version,
-          typeId,
-          lengthTypeIdToString(operatorType)
-        ]);
-    console.log("pv", [
-          packetValues.join(""),
-          packetValues.length
-        ]);
-    var match$2;
-    if (operatorType.TAG === /* TotalLength */0) {
-      var length = operatorType._0;
-      console.log(" +++ Operator, length", length);
-      var sub = $$Array.sub(packetValues, 0, length);
-      var s = decodeSubpacketsByLength(sub, /* [] */0, 0, length);
-      var diff = packetValues.length - length | 0;
-      console.log(" === diff", [
-            diff,
-            packetValues.length,
-            length
-          ]);
-      match$2 = [
-        s,
-        (length + 6 | 0) + packetStart | 0
-      ];
-    } else {
-      var count = operatorType._0;
-      console.log(" +++ Operator, count", count);
-      var match$3 = decodeSubpacketsByCount(packetValues, /* [] */0, 0, count, 0);
-      var subpacketsLength = match$3[1];
-      var diff$1 = value.length - subpacketsLength | 0;
-      console.log(" === l", [
-            subpacketsLength,
-            diff$1,
-            (subpacketsLength + 6 | 0) + packetStart | 0
-          ]);
-      match$2 = [
-        match$3[0],
-        (subpacketsLength + 6 | 0) + packetStart | 0
-      ];
-    }
-    return [
-            {
-              version: version,
-              packetType: {
-                TAG: /* Operator */1,
-                _0: typeId | 0,
-                _1: List.rev(match$2[0])
-              }
-            },
-            match$2[1]
-          ];
+function updatePendingPacket(stackPacket, currentPacket) {
+  var InvalidSubpacket = /* @__PURE__ */Caml_exceptions.create("InvalidSubpacket");
+  var match = stackPacket.packetType;
+  if (match.TAG === /* Literal */0) {
+    throw {
+          RE_EXN_ID: InvalidSubpacket,
+          _1: stackPacket,
+          Error: new Error()
+        };
   }
-  var match$4 = parseLiteralValue($$Array.to_list(value), "", 0);
-  var length$1 = match$4[1];
-  var literalValue = match$4[0];
-  console.log(" +++ Literal", [
-        literalValue,
-        length$1
-      ]);
-  return [
-          {
-            version: version,
-            packetType: {
-              TAG: /* Literal */0,
-              _0: literalValue
-            }
+  var subpackets = List.append(match._1, {
+        hd: currentPacket,
+        tl: /* [] */0
+      });
+  var length = stackPacket.length + currentPacket.length | 0;
+  return {
+          version: stackPacket.version,
+          packetType: {
+            TAG: /* Operator */1,
+            _0: match._0,
+            _1: subpackets
           },
-          length$1 + 6 | 0
-        ];
+          length: length
+        };
+}
+
+function decodePackets(binary, _index, _pendingPacketStack, _packets) {
+  while(true) {
+    var packets = _packets;
+    var pendingPacketStack = _pendingPacketStack;
+    var index = _index;
+    var isComplete = !hasRemainingPackets(index, binary);
+    if (pendingPacketStack) {
+      var match = pendingPacketStack.hd;
+      var length = match.op;
+      if (length.TAG === /* TotalLength */0) {
+        if (packets) {
+          var restPackets = packets.tl;
+          var firstPacket = packets.hd;
+          var restPending = pendingPacketStack.tl;
+          var updatedOpPacket = updatePendingPacket(match.packet, firstPacket);
+          var remaining = match.remaining - firstPacket.length | 0;
+          if (remaining === 0) {
+            var packetList = {
+              hd: updatedOpPacket,
+              tl: restPackets
+            };
+            _packets = packetList;
+            _pendingPacketStack = restPending;
+            continue ;
+          }
+          var stack_0 = {
+            op: {
+              TAG: /* TotalLength */0,
+              _0: length._0
+            },
+            remaining: remaining,
+            packet: updatedOpPacket
+          };
+          var stack = {
+            hd: stack_0,
+            tl: restPending
+          };
+          _packets = restPackets;
+          _pendingPacketStack = stack;
+          continue ;
+        }
+        
+      } else if (packets) {
+        var restPackets$1 = packets.tl;
+        var restPending$1 = pendingPacketStack.tl;
+        var updatedOpPacket$1 = updatePendingPacket(match.packet, packets.hd);
+        var remaining$1 = match.remaining - 1 | 0;
+        if (remaining$1 === 0) {
+          var packetList$1 = {
+            hd: updatedOpPacket$1,
+            tl: restPackets$1
+          };
+          _packets = packetList$1;
+          _pendingPacketStack = restPending$1;
+          continue ;
+        }
+        var stack_0$1 = {
+          op: {
+            TAG: /* SubpacketsCount */1,
+            _0: length._0
+          },
+          remaining: remaining$1,
+          packet: updatedOpPacket$1
+        };
+        var stack$1 = {
+          hd: stack_0$1,
+          tl: restPending$1
+        };
+        _packets = restPackets$1;
+        _pendingPacketStack = stack$1;
+        continue ;
+      }
+      
+    }
+    if (isComplete) {
+      return packets;
+    }
+    var match$1 = splitPacket(index, binary);
+    var nextIndex = match$1[1];
+    var match$2 = match$1[0];
+    var typeId = match$2[1];
+    var version = match$2[0];
+    if (typeId !== 4) {
+      var match$3 = determineOperatorType(nextIndex, binary);
+      var packetStart = match$3[1];
+      var operatorType = match$3[0];
+      var opLength = packetStart - index | 0;
+      if (operatorType.TAG === /* TotalLength */0) {
+        var length$1 = operatorType._0;
+        var op_op = {
+          TAG: /* TotalLength */0,
+          _0: length$1
+        };
+        var op_packet = {
+          version: version,
+          packetType: {
+            TAG: /* Operator */1,
+            _0: typeId | 0,
+            _1: /* [] */0
+          },
+          length: opLength
+        };
+        var op = {
+          op: op_op,
+          remaining: length$1,
+          packet: op_packet
+        };
+        _pendingPacketStack = {
+          hd: op,
+          tl: pendingPacketStack
+        };
+        _index = packetStart;
+        continue ;
+      }
+      var count = operatorType._0;
+      var op_op$1 = {
+        TAG: /* SubpacketsCount */1,
+        _0: count
+      };
+      var op_packet$1 = {
+        version: version,
+        packetType: {
+          TAG: /* Operator */1,
+          _0: typeId | 0,
+          _1: /* [] */0
+        },
+        length: opLength
+      };
+      var op$1 = {
+        op: op_op$1,
+        remaining: count,
+        packet: op_packet$1
+      };
+      _pendingPacketStack = {
+        hd: op$1,
+        tl: pendingPacketStack
+      };
+      _index = packetStart;
+      continue ;
+    }
+    var match$4 = parseLiteral(binary, nextIndex);
+    var idx = match$4[1];
+    var length$2 = idx - index | 0;
+    var packet_packetType = {
+      TAG: /* Literal */0,
+      _0: match$4[0]
+    };
+    var packet = {
+      version: version,
+      packetType: packet_packetType,
+      length: length$2
+    };
+    _packets = {
+      hd: packet,
+      tl: packets
+    };
+    _index = idx;
+    continue ;
+  };
 }
 
 function versionSum(_packets, _sum) {
@@ -433,31 +513,223 @@ function versionSum(_packets, _sum) {
 }
 
 function part1(param) {
-  parseInput(operatorCountExampleStr);
-  var input = parseInput("C0015000016115A2E0802F182340");
-  $$Array.map(Caml_format.caml_int_of_string, "1100000000000001010100000000000000000001011000010001010110100010111000001000000000101111000110000010001101000000".split(""));
-  var match = decodePacket(input);
-  var decoded = match[0];
-  console.log("input", input.join(""));
-  console.log("decoded", decoded);
-  console.log("Decoded", packetToString(decoded));
-  console.log("Length", match[1]);
-  console.log("Sum", versionSum({
-            hd: decoded,
-            tl: /* [] */0
-          }, 0));
-  return decoded;
+  var input = parseInput(inputStr);
+  var packets = decodePackets(input, 0, /* [] */0, /* [] */0);
+  return versionSum(packets, 0);
 }
 
 console.log("Part 1", part1(undefined));
+
+function determinePacketValue(_packets, _value) {
+  while(true) {
+    var value = _value;
+    var packets = _packets;
+    var InvalidPacketTypeId = /* @__PURE__ */Caml_exceptions.create("InvalidPacketTypeId");
+    if (!packets) {
+      return value;
+    }
+    var lvalue = packets.hd.packetType;
+    if (lvalue.TAG === /* Literal */0) {
+      _value = value + lvalue._0;
+      _packets = packets.tl;
+      continue ;
+    }
+    var rest = packets.tl;
+    var subpackets = lvalue._1;
+    var opType = lvalue._0;
+    switch (opType) {
+      case 0 :
+          var sum = List.fold_left((function (psum, packet) {
+                  return psum + determinePacketValue({
+                              hd: packet,
+                              tl: /* [] */0
+                            }, 0);
+                }), 0, subpackets);
+          _value = value + sum;
+          _packets = rest;
+          continue ;
+      case 1 :
+          var product = List.fold_left((function (prod, packet) {
+                  return prod * determinePacketValue({
+                              hd: packet,
+                              tl: /* [] */0
+                            }, 0);
+                }), 1, subpackets);
+          _value = value + product;
+          _packets = rest;
+          continue ;
+      case 2 :
+          var minimum = List.fold_left((function (m, packet) {
+                  var val = determinePacketValue({
+                        hd: packet,
+                        tl: /* [] */0
+                      }, 0);
+                  if (m < val) {
+                    return m;
+                  } else {
+                    return val;
+                  }
+                }), Pervasives.infinity, subpackets);
+          _value = value + minimum;
+          _packets = rest;
+          continue ;
+      case 3 :
+          var maximum = List.fold_left((function (m, packet) {
+                  var val = determinePacketValue({
+                        hd: packet,
+                        tl: /* [] */0
+                      }, 0);
+                  if (m > val) {
+                    return m;
+                  } else {
+                    return val;
+                  }
+                }), Pervasives.infinity * -1, subpackets);
+          _value = value + maximum;
+          _packets = rest;
+          continue ;
+      case 4 :
+          throw {
+                RE_EXN_ID: InvalidPacketTypeId,
+                _1: opType,
+                Error: new Error()
+              };
+      case 5 :
+          var gt;
+          if (subpackets) {
+            var match = subpackets.tl;
+            if (match) {
+              if (match.tl) {
+                throw {
+                      RE_EXN_ID: InvalidPacketTypeId,
+                      _1: 5,
+                      Error: new Error()
+                    };
+              }
+              gt = determinePacketValue({
+                    hd: subpackets.hd,
+                    tl: /* [] */0
+                  }, 0) > determinePacketValue({
+                    hd: match.hd,
+                    tl: /* [] */0
+                  }, 0) ? 1 : 0;
+            } else {
+              throw {
+                    RE_EXN_ID: InvalidPacketTypeId,
+                    _1: 5,
+                    Error: new Error()
+                  };
+            }
+          } else {
+            throw {
+                  RE_EXN_ID: InvalidPacketTypeId,
+                  _1: 5,
+                  Error: new Error()
+                };
+          }
+          _value = value + gt;
+          _packets = rest;
+          continue ;
+      case 6 :
+          var lt;
+          if (subpackets) {
+            var match$1 = subpackets.tl;
+            if (match$1) {
+              if (match$1.tl) {
+                throw {
+                      RE_EXN_ID: InvalidPacketTypeId,
+                      _1: 5,
+                      Error: new Error()
+                    };
+              }
+              lt = determinePacketValue({
+                    hd: subpackets.hd,
+                    tl: /* [] */0
+                  }, 0) < determinePacketValue({
+                    hd: match$1.hd,
+                    tl: /* [] */0
+                  }, 0) ? 1 : 0;
+            } else {
+              throw {
+                    RE_EXN_ID: InvalidPacketTypeId,
+                    _1: 5,
+                    Error: new Error()
+                  };
+            }
+          } else {
+            throw {
+                  RE_EXN_ID: InvalidPacketTypeId,
+                  _1: 5,
+                  Error: new Error()
+                };
+          }
+          _value = value + lt;
+          _packets = rest;
+          continue ;
+      case 7 :
+          var eq;
+          if (subpackets) {
+            var match$2 = subpackets.tl;
+            if (match$2) {
+              if (match$2.tl) {
+                throw {
+                      RE_EXN_ID: InvalidPacketTypeId,
+                      _1: 5,
+                      Error: new Error()
+                    };
+              }
+              eq = determinePacketValue({
+                    hd: subpackets.hd,
+                    tl: /* [] */0
+                  }, 0) === determinePacketValue({
+                    hd: match$2.hd,
+                    tl: /* [] */0
+                  }, 0) ? 1 : 0;
+            } else {
+              throw {
+                    RE_EXN_ID: InvalidPacketTypeId,
+                    _1: 5,
+                    Error: new Error()
+                  };
+            }
+          } else {
+            throw {
+                  RE_EXN_ID: InvalidPacketTypeId,
+                  _1: 5,
+                  Error: new Error()
+                };
+          }
+          _value = value + eq;
+          _packets = rest;
+          continue ;
+      default:
+        throw {
+              RE_EXN_ID: InvalidPacketTypeId,
+              _1: opType,
+              Error: new Error()
+            };
+    }
+  };
+}
+
+function part2(param) {
+  var input = parseInput(inputStr);
+  var packets = decodePackets(input, 0, /* [] */0, /* [] */0);
+  return determinePacketValue(packets, 0);
+}
+
+console.log("Part 2", part2(undefined));
 
 var shortExampleStr = "D2FE28";
 
 var operatorExampleStr = "38006F45291200";
 
+var operatorCountExampleStr = "EE00D40C823060";
+
 exports.shortExampleStr = shortExampleStr;
 exports.operatorExampleStr = operatorExampleStr;
 exports.operatorCountExampleStr = operatorCountExampleStr;
+exports.inputStr = inputStr;
 exports.Binary = Binary;
 exports.pVersion = pVersion;
 exports.packetTypeToString = packetTypeToString;
@@ -465,13 +737,16 @@ exports.packetToString = packetToString;
 exports.parseInput = parseInput;
 exports.a2s = a2s;
 exports.parseLiteralValue = parseLiteralValue;
+exports.parseLiteral = parseLiteral;
 exports.lengthTypeIdToString = lengthTypeIdToString;
 exports.determineOperatorType = determineOperatorType;
+exports.hasRemainingPackets = hasRemainingPackets;
 exports.splitPacket = splitPacket;
 exports.packetsToString = packetsToString;
-exports.decodeSubpacketsByLength = decodeSubpacketsByLength;
-exports.decodeSubpacketsByCount = decodeSubpacketsByCount;
-exports.decodePacket = decodePacket;
+exports.updatePendingPacket = updatePendingPacket;
+exports.decodePackets = decodePackets;
 exports.versionSum = versionSum;
 exports.part1 = part1;
+exports.determinePacketValue = determinePacketValue;
+exports.part2 = part2;
 /*  Not a pure module */

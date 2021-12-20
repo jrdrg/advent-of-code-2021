@@ -2,6 +2,8 @@ let shortExampleStr = "D2FE28"
 let operatorExampleStr = "38006F45291200"
 let operatorCountExampleStr = "EE00D40C823060"
 
+let inputStr = "E0529D18025800ABCA6996534CB22E4C00FB48E233BAEC947A8AA010CE1249DB51A02CC7DB67EF33D4002AE6ACDC40101CF0449AE4D9E4C071802D400F84BD21CAF3C8F2C35295EF3E0A600848F77893360066C200F476841040401C88908A19B001FD35CCF0B40012992AC81E3B980553659366736653A931018027C87332011E2771FFC3CEEC0630A80126007B0152E2005280186004101060C03C0200DA66006B8018200538012C01F3300660401433801A6007380132DD993100A4DC01AB0803B1FE2343500042E24C338B33F5852C3E002749803B0422EC782004221A41A8CE600EC2F8F11FD0037196CF19A67AA926892D2C643675A0C013C00CC0401F82F1BA168803510E3942E969C389C40193CFD27C32E005F271CE4B95906C151003A7BD229300362D1802727056C00556769101921F200AC74015960E97EC3F2D03C2430046C0119A3E9A3F95FD3AFE40132CEC52F4017995D9993A90060729EFCA52D3168021223F2236600ECC874E10CC1F9802F3A71C00964EC46E6580402291FE59E0FCF2B4EC31C9C7A6860094B2C4D2E880592F1AD7782992D204A82C954EA5A52E8030064D02A6C1E4EA852FE83D49CB4AE4020CD80272D3B4AA552D3B4AA5B356F77BF1630056C0119FF16C5192901CEDFB77A200E9E65EAC01693C0BCA76FEBE73487CC64DEC804659274A00CDC401F8B51CE3F8803B05217C2E40041A72E2516A663F119AC72250A00F44A98893C453005E57415A00BCD5F1DD66F3448D2600AC66F005246500C9194039C01986B317CDB10890C94BF68E6DF950C0802B09496E8A3600BCB15CA44425279539B089EB7774DDA33642012DA6B1E15B005C0010C8C917A2B880391160944D30074401D845172180803D1AA3045F00042630C5B866200CC2A9A5091C43BBD964D7F5D8914B46F040"
+
 module Binary = {
   type t = array<int>
 
@@ -45,6 +47,7 @@ module Binary = {
 type rec packet = {
   version: float,
   packetType: packetType,
+  length: int,
 }
 and packetType = Literal(float) | Operator(int, list<packet>)
 
@@ -61,7 +64,9 @@ let rec packetTypeToString = packetType => {
   }
 }
 and packetToString = (packet: packet) => {
-  j`<v(${pVersion(packet)}):${packetTypeToString(packet.packetType)}>`
+  j`<v(${pVersion(packet)}):${packetTypeToString(packet.packetType)}__${string_of_int(
+      packet.length,
+    )}>`
 }
 
 let parseInput = input => {
@@ -90,6 +95,26 @@ let rec parseLiteralValue = (binary: list<int>, value: string, length: int): (fl
   }
 }
 
+let parseLiteral = (binary: Binary.t, index: int) => {
+  exception InvalidLiteralValue(int, string)
+
+  let rec parseLiteralRec = (idx: int, value: string) => {
+    switch Array.sub(binary, idx, 5) {
+    | [1, a, b, c, d] =>
+      let val = value ++ ([a, b, c, d] |> Array.map(string_of_int) |> Js.Array.joinWith(""))
+      parseLiteralRec(idx + 5, val)
+
+    | [0, a, b, c, d] =>
+      let val = value ++ ([a, b, c, d] |> Array.map(string_of_int) |> Js.Array.joinWith(""))
+      (Binary.stringToNumber(val) |> Binary.toDecimal, idx + 5)
+
+    | _ => raise(InvalidLiteralValue(index, ""))
+    }
+  }
+
+  parseLiteralRec(index, "")
+}
+
 type lengthTypeId = TotalLength(int) | SubpacketsCount(int)
 
 let lengthTypeIdToString = typeId => {
@@ -99,136 +124,165 @@ let lengthTypeIdToString = typeId => {
   }
 }
 
-let determineOperatorType = (binary: Binary.t): (lengthTypeId, int) => {
+let determineOperatorType = (index: int, binary: Binary.t): (lengthTypeId, int) => {
   exception InvalidLengthTypeId(string)
-  switch binary[0] {
+
+  switch binary[index] {
   | 0 =>
-    let totalLength = Array.sub(binary, 1, 15) |> Binary.toDecimal
-    (TotalLength(int_of_float(totalLength)), 16)
+    let totalLength = Array.sub(binary, index + 1, 15) |> Binary.toDecimal
+    (TotalLength(int_of_float(totalLength)), index + 16)
 
   | 1 =>
-    let subPacketCount = Array.sub(binary, 1, 11) |> Binary.toDecimal
-    (SubpacketsCount(int_of_float(subPacketCount)), 12)
+    let subPacketCount = Array.sub(binary, index + 1, 11) |> Binary.toDecimal
+    (SubpacketsCount(int_of_float(subPacketCount)), index + 12)
 
   | _ => raise(InvalidLengthTypeId(binary |> Js.Array.joinWith("")))
   }
 }
 
-let splitPacket = (binary: Binary.t) => {
-  let version = Array.sub(binary, 0, 3) |> Binary.toDecimal
-  let typeId = Array.sub(binary, 3, 3) |> Binary.toDecimal
-  let value = Array.sub(binary, 6, Array.length(binary) - 6)
+let hasRemainingPackets = (index: int, binary: Binary.t) => {
+  index < Array.length(binary) - (6 + 1)
+}
 
-  (version, typeId, value)
+let splitPacket = (index: int, binary: Binary.t) => {
+  let version = Array.sub(binary, index, 3) |> Binary.toDecimal
+  let typeId = Array.sub(binary, index + 3, 3) |> Binary.toDecimal
+  let value = Array.sub(binary, index + 6, Array.length(binary) - (index + 6))
+
+  ((version, typeId, value), index + 6)
 }
 
 let packetsToString = packets => {
   packets |> List.map(packetToString) |> Array.of_list
 }
 
-let rec decodeSubpacketsByLength = (
-  binary: Binary.t,
-  subpackets: list<packet>,
-  currentLength: int,
-  totalLength: int,
-) => {
-  Js.log2("decoding subpackets by length", (currentLength, totalLength, Array.length(binary)))
-  if currentLength >= totalLength {
-    Js.log2(" -- COMPLETED READING length", packetsToString(subpackets))
-    Js.log2(" ?? sanity check", (Array.length(binary), currentLength))
-    subpackets
-  } else {
-    let subArray = Array.sub(binary, currentLength, Array.length(binary) - currentLength)
-    Js.log2(" -- length", Array.length(subArray))
+type currentOperation = {
+  op: lengthTypeId,
+  remaining: int,
+  packet: packet,
+}
 
-    let (version, typeId, value) = splitPacket(subArray)
-    let (subpacket, length) = decodePacket(subArray)
-    Js.log2(" -- subpacket split", (version, typeId, a2s(value), length))
-    Js.log2(" -- subpacket", packetToString(subpacket))
+let updatePendingPacket = (stackPacket: packet, currentPacket: packet) => {
+  exception InvalidSubpacket(packet)
+  switch stackPacket {
+  | {packetType: Operator(t, opPackets), length} =>
+    let subpackets = List.append(opPackets, list{currentPacket})
+    let length = length + currentPacket.length
+    {...stackPacket, packetType: Operator(t, subpackets), length: length}
 
-    decodeSubpacketsByLength(
-      subArray,
-      list{subpacket, ...subpackets},
-      currentLength + length,
-      totalLength,
-    )
+  | {packetType: Literal(_)} => raise(InvalidSubpacket(stackPacket))
   }
 }
-and decodeSubpacketsByCount = (
+
+let rec decodePackets = (
   binary: Binary.t,
-  subpackets: list<packet>,
-  currentCount: int,
-  totalCount: int,
-  arrayPos: int,
+  index: int,
+  pendingPacketStack: list<currentOperation>,
+  packets: list<packet>,
 ) => {
-  Js.log2("decoding subpackets by count", (currentCount, totalCount, Array.length(binary)))
-  if currentCount >= totalCount {
-    Js.log2(" -- COMPLETED READING count", (packetsToString(subpackets), arrayPos))
-    (subpackets, arrayPos)
-  } else {
-    let (subpacket, length) = decodePacket(binary)
-    Js.log2(" > decoded by count", (packetToString(subpacket), length))
+  let isComplete = !hasRemainingPackets(index, binary)
 
-    let newLength = Array.length(binary) - length
-    let subArray = Array.sub(binary, length, newLength)
+  switch (isComplete, pendingPacketStack, packets) {
+  | (
+      _,
+      list{{op: TotalLength(length), remaining, packet}, ...restPending},
+      list{firstPacket, ...restPackets},
+    ) =>
+    // pop off the stack and add to packets
+    let updatedOpPacket = updatePendingPacket(packet, firstPacket)
+    let remaining = remaining - firstPacket.length
 
-    Js.log2(" >> new length", (length, newLength))
-    Js.log2(" >> new length", (length, newLength, Array.length(binary), Array.length(subArray)))
-    decodeSubpacketsByCount(
-      subArray,
-      list{subpacket, ...subpackets},
-      currentCount + 1,
-      totalCount,
-      length,
-    )
-  }
-}
-and decodePacket = (binary: Binary.t): (packet, int) => {
-  let (version, typeId, value) = splitPacket(binary)
-  let headerLength = 6
+    if remaining == 0 {
+      let packetList = list{updatedOpPacket, ...restPackets}
+      let stack = restPending
 
-  Js.log2("\n\n -- Decoding packet, length", Array.length(binary))
-  Js.log2(" -- contents", a2s(binary))
-
-  switch typeId {
-  | 4. =>
-    let (literalValue, length) = parseLiteralValue(Array.to_list(value), "", 0)
-    Js.log2(" +++ Literal", (literalValue, length))
-    (
-      {
-        version: version,
-        packetType: Literal(literalValue),
-      },
-      length + headerLength,
-    )
-
-  | t =>
-    let (operatorType, packetStart) = determineOperatorType(value)
-    let packetValues = Array.sub(value, packetStart, Array.length(value) - packetStart)
-
-    Js.log2("operator", (version, typeId, lengthTypeIdToString(operatorType)))
-    Js.log2("pv", (a2s(packetValues), Array.length(packetValues)))
-
-    let (subpackets, length) = switch operatorType {
-    | TotalLength(length) =>
-      Js.log2(" +++ Operator, length", length)
-      let sub = Array.sub(packetValues, 0, length)
-      let s = decodeSubpacketsByLength(sub, list{}, 0, length)
-      let diff = Array.length(packetValues) - length
-      Js.log2(" === diff", (diff, Array.length(packetValues), length))
-
-      (s, length + headerLength + packetStart)
-
-    | SubpacketsCount(count) =>
-      Js.log2(" +++ Operator, count", count)
-      let (s, subpacketsLength) = decodeSubpacketsByCount(packetValues, list{}, 0, count, 0)
-      let diff = Array.length(value) - subpacketsLength
-      Js.log2(" === l", (subpacketsLength, diff, subpacketsLength + headerLength + packetStart))
-      // (s, diff + headerLength + packetStart)
-      (s, subpacketsLength + headerLength + packetStart)
+      decodePackets(binary, index, stack, packetList)
+    } else {
+      let packetList = restPackets
+      let stack = list{
+        {op: TotalLength(length), remaining: remaining, packet: updatedOpPacket},
+        ...restPending,
+      }
+      decodePackets(binary, index, stack, packetList)
     }
 
-    ({version: version, packetType: Operator(int_of_float(t), List.rev(subpackets))}, length)
+  | (
+      _,
+      list{{op: SubpacketsCount(count), remaining, packet}, ...restPending},
+      list{firstPacket, ...restPackets},
+    ) =>
+    // pop off the stack and add to packets
+    let updatedOpPacket = updatePendingPacket(packet, firstPacket)
+
+    let remaining = remaining - 1
+
+    if remaining == 0 {
+      let packetList = list{updatedOpPacket, ...restPackets}
+      let stack = restPending
+
+      decodePackets(binary, index, stack, packetList)
+    } else {
+      let packetList = restPackets
+      let stack = list{
+        {op: SubpacketsCount(count), remaining: remaining, packet: updatedOpPacket},
+        ...restPending,
+      }
+      decodePackets(binary, index, stack, packetList)
+    }
+
+  | (true, _, _) => packets
+
+  // | (list{}, list{packet, ...restPackets}) => // continue, nothing to update
+  // | (list{pending, ...restPending}, list{}) => // continue, can't pop
+  // | (list{}, list{}) => // continue
+
+  | _ =>
+    let ((version, typeId, _value), nextIndex) = splitPacket(index, binary)
+
+    switch typeId {
+    | 4. =>
+      let (literalValue, idx) = parseLiteral(binary, nextIndex)
+      let length = idx - index
+
+      let packet = {
+        version: version,
+        packetType: Literal(literalValue),
+        length: length,
+      }
+
+      decodePackets(binary, idx, pendingPacketStack, list{packet, ...packets})
+
+    | t =>
+      let (operatorType, packetStart) = determineOperatorType(nextIndex, binary)
+
+      let opLength = packetStart - index
+
+      switch operatorType {
+      | TotalLength(length) =>
+        let op = {
+          op: TotalLength(length),
+          remaining: length,
+          packet: {
+            version: version,
+            packetType: Operator(int_of_float(t), list{}),
+            length: opLength,
+          },
+        }
+        decodePackets(binary, packetStart, list{op, ...pendingPacketStack}, packets)
+
+      | SubpacketsCount(count) =>
+        let op = {
+          op: SubpacketsCount(count),
+          remaining: count,
+          packet: {
+            version: version,
+            packetType: Operator(int_of_float(t), list{}),
+            length: opLength,
+          },
+        }
+        decodePackets(binary, packetStart, list{op, ...pendingPacketStack}, packets)
+      }
+    }
   }
 }
 
@@ -243,91 +297,87 @@ let rec versionSum = (packets: list<packet>, sum: float) => {
 }
 
 let part1 = () => {
-  // let input = parseInput(shortExampleStr)
-  // let input = parseInput(operatorExampleStr)
-  let input = parseInput(operatorCountExampleStr)
-  // let input = parseInput("EE00D40C823060")
-  // let input = parseInput("8A004A801A8002F478")
-  // let input = parseInput("620080001611562C8802118E34")
-  let input = parseInput("C0015000016115A2E0802F182340")
-  // let input = parseInput("A0016C880162017C3686B18A3D4780")
+  let input = parseInput(inputStr)
+  let packets = decodePackets(input, 0, list{}, list{})
 
-  let _input =
-    // "00000000000000000101100001000101010110001011001000100000000010000100011000111000110100"
-    "1100000000000001010100000000000000000001011000010001010110100010111000001000000000101111000110000010001101000000"
-    |> Js.String.split("")
-    |> Array.map(int_of_string)
-
-  let (decoded, length) = decodePacket(input)
-
-  Js.log2("input", input |> a2s)
-  Js.log2("decoded", decoded)
-
-  Js.log2("Decoded", packetToString(decoded))
-  Js.log2("Length", length)
-  Js.log2("Sum", versionSum(list{decoded}, 0.))
-
-  decoded
+  versionSum(packets, 0.)
 }
 
 Js.log2("Part 1", part1())
 
-/*
+let rec determinePacketValue = (packets: list<packet>, value: float) => {
+  exception InvalidPacketTypeId(int)
 
-104
-01100010000000001000000000000000000101100001000101010110001011001000100000000010000100011000111000110100
-011000 = v4, type 0 (operator)
+  switch packets {
+  | list{} => value
+  | list{{packetType: Literal(lvalue)}, ...rest} => determinePacketValue(rest, value +. lvalue)
+  | list{{packetType: Operator(opType, subpackets)}, ...rest} =>
+    switch opType {
+    | 0 =>
+      let sum = subpackets |> List.fold_left((psum, packet) => {
+        psum +. determinePacketValue(list{packet}, 0.)
+      }, 0.)
+      determinePacketValue(rest, value +. sum)
+    | 1 =>
+      let product = subpackets |> List.fold_left((prod, packet) => {
+        prod *. determinePacketValue(list{packet}, 0.)
+      }, 1.)
+      determinePacketValue(rest, value +. product)
+    | 2 =>
+      let minimum = subpackets |> List.fold_left((m, packet) => {
+        let val = determinePacketValue(list{packet}, 0.)
+        min(m, val)
+      }, infinity)
+      determinePacketValue(rest, value +. minimum)
+    | 3 =>
+      let maximum = subpackets |> List.fold_left((m, packet) => {
+        let val = determinePacketValue(list{packet}, 0.)
+        max(m, val)
+      }, infinity *. -1.)
+      determinePacketValue(rest, value +. maximum)
+    | 5 =>
+      let gt = switch subpackets {
+      | list{first, second} =>
+        if determinePacketValue(list{first}, 0.) > determinePacketValue(list{second}, 0.) {
+          1.
+        } else {
+          0.
+        }
+      | _ => raise(InvalidPacketTypeId(5))
+      }
+      determinePacketValue(rest, value +. gt)
+    | 6 =>
+      let lt = switch subpackets {
+      | list{first, second} =>
+        if determinePacketValue(list{first}, 0.) < determinePacketValue(list{second}, 0.) {
+          1.
+        } else {
+          0.
+        }
+      | _ => raise(InvalidPacketTypeId(5))
+      }
+      determinePacketValue(rest, value +. lt)
+    | 7 =>
+      let eq = switch subpackets {
+      | list{first, second} =>
+        if determinePacketValue(list{first}, 0.) == determinePacketValue(list{second}, 0.) {
+          1.
+        } else {
+          0.
+        }
+      | _ => raise(InvalidPacketTypeId(5))
+      }
+      determinePacketValue(rest, value +. eq)
+    | t => raise(InvalidPacketTypeId(t))
+    }
+  }
+}
 
-98
-10000000001000000000000000000101100001000101010110001011001000100000000010000100011000111000110100
-length type 1
+let part2 = () => {
+  let input = parseInput(inputStr)
+  let packets = decodePackets(input, 0, list{}, list{})
 
-97
-0000000001000000000000000000101100001000101010110001011001000100000000010000100011000111000110100
+  determinePacketValue(packets, 0.)
+}
 
-length 11
-00000000010 = 2
-
-86
-00000000000000000101100001000101010110001011001000100000000010000100011000111000110100
-000000 = v0, type 0 (operator)
-
-80
-00000000000101100001000101010110001011001000100000000010000100011000111000110100
-length type 0
-
-79
-0000000000101100001000101010110001011001000100000000010000100011000111000110100
-
-length 15
-000000000010110 = 22
-
-64
-0001000101010110001011001000100000000010000100011000111000110100
-
-22 bits
-0001000101010110001011
-
-000100 = v0, type 4 (literal)
-
-0101010110001011
-01010 = 0, 1010 = 10
-
-10110001011
-101100 = v5, type 4 (literal)
-
-01011 = 0, 1011 = 11
-
-remaining (42)
-001000100000000010000100011000111000110100
-
-*/
-
-/*
-
-112
-1100000000000001010100000000000000000001011000010001010110100010111000001000000000101111000110000010001101000000
-
-
-
-*/
+Js.log2("Part 2", part2())
