@@ -65,15 +65,27 @@ let fromString = (converter: string => 'v, input: string): t<'v> => {
   }, Belt.Map.String.empty)
 }
 
-let size = (grid: t<'v>): (int, int) => {
-  let (mR, mC) =
-    Belt.Map.String.keysToArray(grid) |> Array.to_list |> List.fold_left(((curH, curW), point) => {
+let boundaries = (grid: t<'v>) => {
+  let (minR, maxR, minC, maxC) =
+    Belt.Map.String.keysToArray(grid)
+    |> Array.to_list
+    |> List.fold_left(((curMinR, curMaxR, curMinC, curMaxC), point) => {
       let (r, c) = stringToCoords(point)
 
-      (max(curH, r), max(curW, c))
-    }, (Int32.min_int |> Int32.to_int, Int32.min_int |> Int32.to_int))
+      (min(curMinR, r), max(curMaxR, r), min(curMinC, c), max(curMaxC, c))
+    }, (
+      Int32.max_int |> Int32.to_int,
+      Int32.min_int |> Int32.to_int,
+      Int32.max_int |> Int32.to_int,
+      Int32.min_int |> Int32.to_int,
+    ))
 
-  (mR + 1, mC + 1)
+  ((minR, minC), (maxR, maxC))
+}
+
+let size = (grid: t<'v>): (int, int) => {
+  let ((minR, minC), (maxR, maxC)) = boundaries(grid)
+  (maxR - minR, maxC - minC)
 }
 
 let pointsCount = (grid: t<'v>) => {
@@ -113,4 +125,30 @@ let print = (fn: option<'v> => string, grid: t<'v>): string => {
   }
 
   printRows(0, "")
+}
+
+let isWithinBoundaries = ((r, c): (int, int), grid: t<'v>) => {
+  let ((minR, minC), (maxR, maxC)) = boundaries(grid)
+
+  r >= minR && r <= maxR && c >= minC && c <= maxC
+}
+
+let distance = ((r, c): (int, int), grid: t<'v>) => {
+  let ((minR, minC), (maxR, maxC)) = boundaries(grid)
+  let rDist = if r < minR {
+    r - minR
+  } else if r >= minR && r < maxR {
+    0
+  } else {
+    r - maxR
+  }
+  let cDist = if c < minC {
+    c - minC
+  } else if c >= minC && c < maxC {
+    0
+  } else {
+    c - maxC
+  }
+
+  (rDist, cDist)
 }

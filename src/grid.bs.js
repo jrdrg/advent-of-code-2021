@@ -155,20 +155,42 @@ function fromString(converter, input) {
                   }), rows));
 }
 
-function size(grid) {
+function boundaries(grid) {
   var match = List.fold_left((function (param, point) {
           var match = stringToCoords(point);
+          var c = match[1];
+          var r = match[0];
           return [
-                  Caml.caml_int_max(param[0], match[0]),
-                  Caml.caml_int_max(param[1], match[1])
+                  Caml.caml_int_min(param[0], r),
+                  Caml.caml_int_max(param[1], r),
+                  Caml.caml_int_min(param[2], c),
+                  Caml.caml_int_max(param[3], c)
                 ];
         }), [
+        Int32.max_int,
         Int32.min_int,
+        Int32.max_int,
         Int32.min_int
       ], $$Array.to_list(Belt_MapString.keysToArray(grid)));
   return [
-          match[0] + 1 | 0,
-          match[1] + 1 | 0
+          [
+            match[0],
+            match[2]
+          ],
+          [
+            match[1],
+            match[3]
+          ]
+        ];
+}
+
+function size(grid) {
+  var match = boundaries(grid);
+  var match$1 = match[1];
+  var match$2 = match[0];
+  return [
+          match$1[0] - match$2[0] | 0,
+          match$1[1] - match$2[1] | 0
         ];
 }
 
@@ -218,6 +240,41 @@ function print(fn, grid) {
   };
 }
 
+function isWithinBoundaries(param, grid) {
+  var c = param[1];
+  var r = param[0];
+  var match = boundaries(grid);
+  var match$1 = match[1];
+  var match$2 = match[0];
+  if (r >= match$2[0] && r <= match$1[0] && c >= match$2[1]) {
+    return c <= match$1[1];
+  } else {
+    return false;
+  }
+}
+
+function distance(param, grid) {
+  var c = param[1];
+  var r = param[0];
+  var match = boundaries(grid);
+  var match$1 = match[1];
+  var maxC = match$1[1];
+  var maxR = match$1[0];
+  var match$2 = match[0];
+  var minC = match$2[1];
+  var minR = match$2[0];
+  var rDist = r < minR ? r - minR | 0 : (
+      r >= minR && r < maxR ? 0 : r - maxR | 0
+    );
+  var cDist = c < minC ? c - minC | 0 : (
+      c >= minC && c < maxC ? 0 : c - maxC | 0
+    );
+  return [
+          rDist,
+          cDist
+        ];
+}
+
 exports.coordsToString = coordsToString;
 exports.stringToCoords = stringToCoords;
 exports.getAdjacentNeighborCoords = getAdjacentNeighborCoords;
@@ -229,9 +286,12 @@ exports.valueAt = valueAt;
 exports.setValueAt = setValueAt;
 exports.toPointsList = toPointsList;
 exports.fromString = fromString;
+exports.boundaries = boundaries;
 exports.size = size;
 exports.pointsCount = pointsCount;
 exports.fromPointsList = fromPointsList;
 exports.fromPointsAndValueList = fromPointsAndValueList;
 exports.print = print;
+exports.isWithinBoundaries = isWithinBoundaries;
+exports.distance = distance;
 /* No side effect */
